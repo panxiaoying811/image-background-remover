@@ -174,10 +174,10 @@ export default function Home() {
       <Header usageCount={usageCount} dailyLimit={DAILY_LIMIT} />
       
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        {!originalImage && !resultImage ? (
+        {!originalImage && !resultImage && !isProcessing ? (
           /* Upload Zone - Click only */
           <div
-            className={`upload-zone ${isProcessing ? "opacity-50 pointer-events-none" : ""}`}
+            className="upload-zone"
             onClick={handleUploadClick}
             onKeyDown={handleKeyDown}
             role="button"
@@ -192,28 +192,21 @@ export default function Home() {
               style={{ display: "none" }}
             />
             
-            {isProcessing ? (
-              <div className="space-y-4">
-                <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-gray-600 text-lg">正在处理...</p>
+            <div className="space-y-4">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">
+                <span className="text-4xl">📤</span>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-4xl">📤</span>
-                </div>
-                <div>
-                  <p className="text-xl font-semibold text-gray-700">
-                    点击选择图片
-                  </p>
-                  <p className="text-gray-500 mt-2">或直接上传文件</p>
-                </div>
-                <div className="text-sm text-gray-400 space-y-1">
-                  <p>支持 PNG、JPG、WebP 格式</p>
-                  <p>文件大小不超过 10MB</p>
-                </div>
+              <div>
+                <p className="text-xl font-semibold text-gray-700">
+                  点击选择图片
+                </p>
+                <p className="text-gray-500 mt-2">或直接上传文件</p>
               </div>
-            )}
+              <div className="text-sm text-gray-400 space-y-1">
+                <p>支持 PNG、JPG、WebP 格式</p>
+                <p>文件大小不超过 10MB</p>
+              </div>
+            </div>
           </div>
         ) : (
           /* Preview and Result */
