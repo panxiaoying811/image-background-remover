@@ -23,7 +23,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     // Simple password check - you can change this
-    const correctPassword = "picremove2024";
+    const correctPassword = "ab-666606";
 
     // Simulate network delay for security
     await new Promise((resolve) => setTimeout(resolve, 500));
