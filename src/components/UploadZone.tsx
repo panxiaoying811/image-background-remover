@@ -13,34 +13,44 @@ export default function UploadZone({ onUpload, isProcessing }: UploadZoneProps) 
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
     
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      onUpload(file);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      onUpload(files[0]);
     }
   }, [onUpload]);
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onUpload(file);
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      onUpload(files[0]);
     }
-  };
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  }, [onUpload]);
+
+  // Prevent click propagation when clicking on the input itself
+  const handleInputClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   return (
     <div
@@ -49,13 +59,24 @@ export default function UploadZone({ onUpload, isProcessing }: UploadZoneProps) 
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
     >
+      {/* File input - using inline styles instead of Tailwind hidden class for better browser compatibility */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/png,image/jpeg,image/jpg"
         onChange={handleFileChange}
-        className="hidden"
+        onClick={handleInputClick}
+        style={{ display: "none" }}
+        aria-label="上传图片"
       />
       
       {isProcessing ? (
