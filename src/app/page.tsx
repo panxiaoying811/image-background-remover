@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Header from "@/components/Header";
-import UploadZone from "@/components/UploadZone";
 import Preview from "@/components/Preview";
 import DownloadButton from "@/components/DownloadButton";
 
@@ -20,6 +19,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [isLimitReached, setIsLimitReached] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load usage count from localStorage
   useEffect(() => {
@@ -27,18 +28,22 @@ export default function Home() {
     const stored = localStorage.getItem("picremove_usage");
     
     if (stored) {
-      const record: UsageRecord = JSON.parse(stored);
-      if (record.date === today) {
-        setUsageCount(record.count);
-        if (record.count >= DAILY_LIMIT) {
-          setIsLimitReached(true);
+      try {
+        const record: UsageRecord = JSON.parse(stored);
+        if (record.date === today) {
+          setUsageCount(record.count);
+          if (record.count >= DAILY_LIMIT) {
+            setIsLimitReached(true);
+          }
         }
+      } catch (e) {
+        console.error("Failed to parse usage record:", e);
       }
     }
   }, []);
 
   // Save usage count to localStorage
-  const incrementUsage = () => {
+  const incrementUsage = useCallback(() => {
     const today = new Date().toDateString();
     const newCount = usageCount + 1;
     setUsageCount(newCount);
@@ -50,17 +55,25 @@ export default function Home() {
     if (newCount >= DAILY_LIMIT) {
       setIsLimitReached(true);
     }
-  };
+  }, [usageCount]);
 
-  const handleImageUpload = useCallback(async (file: File) => {
-    // Validate file
-    if (!file.type.includes("png") && !file.type.includes("jpeg") && !file.type.includes("jpg")) {
-      setError("请上传 PNG 或 JPG 格式的图片");
-      return;
+  // Validate file before processing
+  const validateFile = useCallback((file: File): string | null => {
+    const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      return "请上传 PNG、JPG 或 WebP 格式的图片";
     }
-    
     if (file.size > 10 * 1024 * 1024) {
-      setError("图片大小不能超过 10MB");
+      return "图片大小不能超过 10MB";
+    }
+    return null;
+  }, []);
+
+  // Process the image
+  const processImage = useCallback(async (file: File) => {
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -82,36 +95,104 @@ export default function Home() {
       // Convert file to base64
       const base64 = await fileToBase64(file);
 
-      // Call API
+      // Call API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
       const response = await fetch("/api/remove-bg", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ image: base64 }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "处理失败");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `处理失败 (${response.status})`);
       }
 
       const data = await response.json();
+      
+      if (!data.result) {
+        throw new Error("处理返回结果为空");
+      }
+
       setResultImage(data.result);
       incrementUsage();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "处理失败，请重试");
+      console.error("Upload error:", err);
+      if (err instanceof Error) {
+        if (err.name === "AbortError") {
+          setError("处理超时，请重试");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("处理失败，请重试");
+      }
       setOriginalImage(null);
+      setResultImage(null);
     } finally {
       setIsProcessing(false);
     }
-  }, [isLimitReached]);
+  }, [isLimitReached, validateFile, incrementUsage]);
 
-  const handleReset = () => {
+  // File input change handler
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      processImage(files[0]);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  }, [processImage]);
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processImage(files[0]);
+    }
+  }, [processImage]);
+
+  // Click to open file dialog
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // Keyboard support
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleUploadClick();
+    }
+  }, [handleUploadClick]);
+
+  const handleReset = useCallback(() => {
     setOriginalImage(null);
     setResultImage(null);
     setError(null);
-  };
+  }, []);
 
   return (
     <main className="min-h-screen">
@@ -119,8 +200,51 @@ export default function Home() {
       
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {!originalImage && !resultImage ? (
-          <UploadZone onUpload={handleImageUpload} isProcessing={isProcessing} />
+          /* Upload Zone */
+          <div
+            className={`upload-zone ${isDragOver ? "drag-over" : ""} ${isProcessing ? "opacity-50 pointer-events-none" : ""}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={handleUploadClick}
+            onKeyDown={handleKeyDown}
+            role="button"
+            tabIndex={0}
+            aria-label="上传图片区域"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+            
+            {isProcessing ? (
+              <div className="space-y-4">
+                <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-600 text-lg">正在处理...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-4xl">📤</span>
+                </div>
+                <div>
+                  <p className="text-xl font-semibold text-gray-700">
+                    拖拽图片到这里
+                  </p>
+                  <p className="text-gray-500 mt-2">或点击选择文件</p>
+                </div>
+                <div className="text-sm text-gray-400 space-y-1">
+                  <p>支持 PNG、JPG、WebP 格式</p>
+                  <p>文件大小不超过 10MB</p>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
+          /* Preview and Result */
           <div className="space-y-6">
             <Preview
               originalImage={originalImage}
@@ -147,11 +271,13 @@ export default function Home() {
   );
 }
 
+// Helper function to convert file to base64
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error("文件读取失败"));
+    reader.onabort = () => reject(new Error("文件读取被中断"));
   });
 }
