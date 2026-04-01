@@ -19,7 +19,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [isLimitReached, setIsLimitReached] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load usage count from localStorage
@@ -151,30 +150,6 @@ export default function Home() {
     e.target.value = "";
   }, [processImage]);
 
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      processImage(files[0]);
-    }
-  }, [processImage]);
-
   // Click to open file dialog
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -200,12 +175,9 @@ export default function Home() {
       
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {!originalImage && !resultImage ? (
-          /* Upload Zone */
+          /* Upload Zone - Click only */
           <div
-            className={`upload-zone ${isDragOver ? "drag-over" : ""} ${isProcessing ? "opacity-50 pointer-events-none" : ""}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            className={`upload-zone ${isProcessing ? "opacity-50 pointer-events-none" : ""}`}
             onClick={handleUploadClick}
             onKeyDown={handleKeyDown}
             role="button"
@@ -232,9 +204,9 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="text-xl font-semibold text-gray-700">
-                    拖拽图片到这里
+                    点击选择图片
                   </p>
-                  <p className="text-gray-500 mt-2">或点击选择文件</p>
+                  <p className="text-gray-500 mt-2">或直接上传文件</p>
                 </div>
                 <div className="text-sm text-gray-400 space-y-1">
                   <p>支持 PNG、JPG、WebP 格式</p>
