@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Preview from "@/components/Preview";
 import DownloadButton from "@/components/DownloadButton";
@@ -19,7 +20,19 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [isLimitReached, setIsLimitReached] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+
+  // Auth check
+  useEffect(() => {
+    const isLoggedIn = sessionStorage.getItem("picremove_auth");
+    if (isLoggedIn !== "true") {
+      router.push("/login");
+    } else {
+      setIsAuthenticated(true);
+    }
+  }, [router]);
 
   // Load usage count from localStorage
   useEffect(() => {
@@ -168,6 +181,15 @@ export default function Home() {
     setResultImage(null);
     setError(null);
   }, []);
+
+  // Show loading while checking auth
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen">
